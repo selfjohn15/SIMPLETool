@@ -46,4 +46,4 @@ When a building is selected, you can customize its properties in the right-side 
 | `Ctrl + Drag` | Pan canvas |
 | `Mouse Wheel` | Zoom in / out |
 
-*Author: John Self (SecretAgentSelf)*
+*Author: SecretAgentSelf*
