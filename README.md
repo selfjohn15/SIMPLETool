@@ -33,17 +33,17 @@ When a building is selected, you can customize its properties in the right-side 
 
 ## Keyboard Shortcuts
 
-| Shortcut | Action |
-| :--- | :--- |
-| `S` | Select Tool |
-| `D` | Draw Tool |
-| `E` | Erase Tool |
-| `I` | Add Input port to selected building |
-| `O` | Add Output port to selected building |
-| `R` | Rotate Building / Rotate Preset |
-| `Delete` / `Backspace` | Delete selected building |
-| `Esc` | Deselect building / Cancel preset placement |
-| `Ctrl + Drag` | Pan canvas |
-| `Mouse Wheel` | Zoom in / out |
+| Shortcut                  | Action |
+| :---                      | :--- |
+| `S`                       | Select Tool |
+| `D`                       | Draw Tool |
+| `E`                       | Erase Tool |
+| `I`                       | Add Input port to selected building |
+| `O`                       | Add Output port to selected building |
+| `R`                       | Rotate Building / Rotate Preset |
+| `Delete` / `Backspace`    | Delete selected building |
+| `Esc`                     | Deselect building / Cancel preset placement |
+| `Ctrl + Drag`             | Pan canvas |
+| `Mouse Wheel`             | Zoom in / out |
 
 *Author: SecretAgentSelf*
