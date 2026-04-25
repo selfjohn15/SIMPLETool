@@ -1,0 +1,630 @@
+<!-- 
+  Author: John Self (SecretAgentSelf)
+  Date:   April 25, 2026
+  Title: S.I.M.P.L.E Tool Satisfactory Implementation Management Planning Logistics Executor Tool
+-->
+
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Satisfactory Factory Planner</title>
+<style>
+  :root {
+    --bg: #111214;
+    --panel-bg: #1a1b1e;
+    --entry-bg: #222428;
+    --cvs-bg: #0c0d0e;
+    --grid1: #1c1e21;
+    --grid5: #2a2d32;
+    --accent: #e8922a;
+    --accent2: #a05e14;
+    --text: #dde0e4;
+    --dim: #555a62;
+    --in-c: #2ecc71;
+    --out-c: #e74c3c;
+    --sel-c: #f1c40f;
+  }
+  
+  body {
+    margin: 0; padding: 0;
+    background-color: var(--bg); color: var(--text);
+    font-family: monospace;
+    display: flex; flex-direction: column;
+    height: 100vh; overflow: hidden;
+    user-select: none;
+  }
+  
+  #toolbar {
+    background-color: #0e0f11; padding: 8px 12px;
+    display: flex; align-items: center; gap: 8px;
+    border-bottom: 1px solid var(--grid5);
+  }
+  
+  .btn {
+    background-color: #1c1c1c; color: var(--dim);
+    border: none; padding: 6px 12px; cursor: pointer;
+    font-family: monospace; font-size: 12px; border-radius: 2px;
+  }
+  .btn:hover { background-color: var(--panel-bg); color: var(--text); }
+  .btn.active { background-color: var(--accent); color: white; }
+  .btn.danger { color: #cc5555; }
+  
+  .divider { width: 1px; height: 20px; background-color: var(--grid5); margin: 0 4px; }
+  
+  #content { display: flex; flex: 1; min-height: 0; }
+  
+  #canvas-wrapper {
+    flex: 1; overflow: auto; background-color: var(--bg);
+    display: flex; align-items: flex-start; justify-content: flex-start;
+  }
+  
+  canvas {
+    background-color: var(--cvs-bg); display: block;
+    cursor: crosshair; flex-shrink: 0;
+  }
+  
+  #right-panel {
+    width: 250px; background-color: var(--panel-bg);
+    display: flex; flex-direction: column;
+    border-left: 1px solid #222; flex-shrink: 0;
+  }
+  
+  #props-panel { border-bottom: 1px solid #222; }
+  #presets-panel { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+  
+  .panel-section { padding: 10px; }
+  .panel-header { font-size: 10px; font-weight: bold; color: var(--dim); margin-bottom: 8px; }
+  
+  .input-row { display: flex; gap: 4px; margin-bottom: 4px; }
+  input[type="text"], input[type="number"], select {
+    background-color: var(--entry-bg); color: var(--text);
+    border: 1px solid #2e2e2e; padding: 4px;
+    font-family: monospace; font-size: 11px;
+    width: 100%; box-sizing: border-box;
+  }
+  
+  .color-swatches { display: flex; gap: 4px; margin-bottom: 10px; }
+  .swatch { width: 20px; height: 20px; cursor: pointer; border-radius: 2px; }
+  
+  #presets-list { flex: 1; overflow-y: auto; padding: 10px; }
+  .preset-card {
+    background-color: var(--bg); border: 1px solid #2a2a2a;
+    padding: 6px; margin-bottom: 8px; font-size: 11px;
+  }
+  
+  #status-bar { background-color: #080909; color: var(--dim); padding: 4px 10px; font-size: 11px; }
+  
+  dialog {
+    background-color: var(--bg); color: var(--text);
+    border: none; border-top: 3px solid var(--accent);
+    padding: 20px; font-family: monospace; border-radius: 4px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+  }
+  dialog::backdrop { background-color: rgba(0,0,0,0.6); }
+  .dialog-buttons { margin-top: 20px; display: flex; gap: 10px; justify-content: center; }
+</style>
+</head>
+<body>
+
+<div id="toolbar">
+  <div style="color:var(--accent); font-size:16px;">⬡</div>
+  <div style="color:var(--accent); font-weight:bold; font-size:12px; margin-right:8px;">SATISFACTORY FACTORY PLANNER</div>
+  <div class="divider"></div>
+  <button id="btn-select" class="btn tool-btn active">◈ Select [S]</button>
+  <button id="btn-draw" class="btn tool-btn">⬜ Draw [D]</button>
+  <button id="btn-erase" class="btn tool-btn">✕ Erase [E]</button>
+  <div class="divider"></div>
+  <button id="btn-zoom-in" class="btn" title="Zoom In (Wheel Up)">🔍+</button>
+  <button id="btn-zoom-out" class="btn" title="Zoom Out (Wheel Down)">🔍-</button>
+  <div class="divider"></div>
+  <button id="btn-load" class="btn">📂 Load Layout</button>
+  <button id="btn-save" class="btn">💾 Save Layout</button>
+  <button id="btn-resize" class="btn">⊞ Resize Grid</button>
+  <button id="btn-clear" class="btn danger">🗑 Clear All</button>
+</div>
+
+<div id="content">
+  <div id="canvas-wrapper">
+    <canvas id="canvas"></canvas>
+  </div>
+  <div id="right-panel">
+    <div id="props-panel"></div>
+    <div id="presets-panel"></div>
+  </div>
+</div>
+
+<div id="status-bar">Ready | S=Select D=Draw E=Erase I=Add Input O=Add Output R=Rotate Del=Delete Esc=Deselect | Wheel=Zoom Ctrl+Drag=Pan</div>
+
+<dialog id="resize-dialog">
+  <div style="color:var(--accent); font-weight:bold; text-align:center; font-size:14px;">SET GRID SIZE</div>
+  <div style="display:flex; flex-direction:column; gap:10px; margin-top:15px;">
+    <div style="display:flex; justify-content:space-between; align-items:center; gap:20px;">
+      <span>Width (columns):</span>
+      <input type="number" id="dlg-grid-w" style="width:60px; padding:4px;" min="5" max="120">
+    </div>
+    <div style="display:flex; justify-content:space-between; align-items:center; gap:20px;">
+      <span>Height (rows):</span>
+      <input type="number" id="dlg-grid-h" style="width:60px; padding:4px;" min="5" max="120">
+    </div>
+  </div>
+  <div class="dialog-buttons">
+    <button class="btn" id="btn-apply-resize" style="background:var(--accent); color:white; font-weight:bold; padding:6px 16px;">Apply</button>
+    <button class="btn" id="btn-cancel-resize" style="padding:6px 16px;">Cancel</button>
+  </div>
+</dialog>
+
+<script>
+const DEFAULT_W = 26;
+const DEFAULT_H = 18;
+const CELL = 38;
+const PORT_R = 7;
+const BPAL = ["#1e4c82", "#7a1e40", "#1e6e3e", "#6e4e1a", "#3e1e82", "#1a5e72", "#5e5e1e", "#722e2e"];
+const SIDES = ["Top", "Right", "Bottom", "Left"];
+
+let app = {
+  gridW: DEFAULT_W, gridH: DEFAULT_H, buildings: [], presets: [],
+  selId: null, tool: "SELECT", hoverCell: null,
+  drawStart: null, drawCur: null, moveOff: null, presetBuf: null, zoom: 1.0,
+  isPanning: false, panStartX: 0, panStartY: 0, panScrollX: 0, panScrollY: 0
+};
+
+try {
+  let saved = localStorage.getItem("satisfactory_presets");
+  if(saved) app.presets = JSON.parse(saved);
+} catch(e) {}
+
+function savePresets() {
+  localStorage.setItem("satisfactory_presets", JSON.stringify(app.presets));
+  renderPresets();
+}
+
+function uuid() {
+  return typeof crypto.randomUUID === "function" ? crypto.randomUUID() : 
+    'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+      let r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+      return v.toString(16);
+    });
+}
+
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+
+function resizeCanvas() {
+  canvas.width = app.gridW * CELL * app.zoom; 
+  canvas.height = app.gridH * CELL * app.zoom;
+  redraw();
+}
+
+function redraw() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  
+  ctx.save();
+  ctx.scale(app.zoom, app.zoom);
+  
+  let cW = app.gridW * CELL, cH = app.gridH * CELL;
+  
+  ctx.lineWidth = 1;
+  for(let x=0; x<=app.gridW; x++) {
+    ctx.strokeStyle = x % 5 === 0 ? "#2a2d32" : "#1c1e21";
+    ctx.beginPath(); ctx.moveTo(x*CELL, 0); ctx.lineTo(x*CELL, cH); ctx.stroke();
+  }
+  for(let y=0; y<=app.gridH; y++) {
+    ctx.strokeStyle = y % 5 === 0 ? "#2a2d32" : "#1c1e21";
+    ctx.beginPath(); ctx.moveTo(0, y*CELL); ctx.lineTo(cW, y*CELL); ctx.stroke();
+  }
+
+  if (app.hoverCell && ["DRAW", "PLACE", "ERASE"].includes(app.tool)) {
+     let [gx, gy] = app.hoverCell;
+     if (gx >= 0 && gx < app.gridW && gy >= 0 && gy < app.gridH) {
+        ctx.fillStyle = "#1e2124"; ctx.fillRect(gx*CELL, gy*CELL, CELL, CELL);
+     }
+  }
+
+  for(let b of app.buildings) drawBuilding(b);
+
+  if (app.drawStart && app.drawCur) {
+     let gx0 = app.drawStart[0], gy0 = app.drawStart[1];
+     let gx1 = app.drawCur[0], gy1 = app.drawCur[1];
+     let minX = Math.min(gx0, gx1), minY = Math.min(gy0, gy1);
+     let maxX = Math.max(gx0, gx1), maxY = Math.max(gy0, gy1);
+     let px = minX*CELL + 2, py = minY*CELL + 2;
+     let pw = (maxX - minX + 1)*CELL - 4, ph = (maxY - minY + 1)*CELL - 4;
+     
+     ctx.strokeStyle = "#e8922a"; ctx.setLineDash([4, 2]);
+     ctx.fillStyle = "rgba(232, 146, 42, 0.15)";
+     ctx.fillRect(px, py, pw, ph); ctx.strokeRect(px, py, pw, ph); ctx.setLineDash([]);
+     
+     ctx.fillStyle = "#e8922a"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+     ctx.font = "11px monospace"; ctx.fillText(`${maxX-minX+1}×${maxY-minY+1}`, px + pw/2, py + ph/2);
+  }
+
+  if (app.presetBuf && app.hoverCell) {
+     let p = app.presetBuf, [gx, gy] = app.hoverCell;
+     let px = gx*CELL + 2, py = gy*CELL + 2, pw = p.gw*CELL - 4, ph = p.gh*CELL - 4;
+     
+     ctx.strokeStyle = "#a05e14"; ctx.setLineDash([3, 2]);
+     ctx.fillStyle = "rgba(255,255,255,0.05)";
+     ctx.fillRect(px, py, pw, ph); ctx.strokeRect(px, py, pw, ph); ctx.setLineDash([]);
+     
+     ctx.fillStyle = "#dde0e4"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+     ctx.font = "bold 11px monospace"; ctx.fillText(p.name, px + pw/2, py + ph/2);
+  }
+  ctx.restore();
+}
+
+function drawBuilding(b) {
+  let isSel = (b.id === app.selId);
+  let px = b.gx*CELL + 2, py = b.gy*CELL + 2, pw = b.gw*CELL - 4, ph = b.gh*CELL - 4;
+  
+  ctx.fillStyle = "#060606"; ctx.fillRect(px+3, py+3, pw, ph); // shadow
+  ctx.fillStyle = b.color; ctx.fillRect(px, py, pw, ph); // body
+  
+  ctx.strokeStyle = lighten(b.color, 40); ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(px+1, py+1); ctx.lineTo(px+pw-1, py+1); ctx.stroke(); // inner highlight
+  
+  ctx.strokeStyle = isSel ? "#f1c40f" : lighten(b.color, 50);
+  ctx.lineWidth = isSel ? 2 : 1; ctx.strokeRect(px, py, pw, ph); // border
+  
+  if (isSel) {
+    ctx.strokeStyle = "#f1c40f"; ctx.setLineDash([5,3]); ctx.lineWidth = 1;
+    ctx.strokeRect(px-3, py-3, pw+6, ph+6); ctx.setLineDash([]);
+  }
+  
+  let cx = px + pw/2, cy = py + ph/2;
+  ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.font = "bold 12px monospace";
+  ctx.fillStyle = "#080808"; ctx.fillText(b.name, cx+1, cy+1);
+  ctx.fillStyle = "#dde0e4"; ctx.fillText(b.name, cx, cy);
+  
+  ctx.textAlign = "right"; ctx.textBaseline = "bottom"; ctx.font = "10px monospace";
+  ctx.fillStyle = lighten(b.color, 30); ctx.fillText(`${b.gw}×${b.gh}`, px+pw-2, py+ph-2);
+  
+  drawPortGroup(b, b.inputs, "#2ecc71", "▶");
+  drawPortGroup(b, b.outputs, "#e74c3c", "◀");
+}
+
+function lighten(hex, amt=55) {
+  let r = Math.min(255, parseInt(hex.substring(1,3), 16) + amt);
+  let g = Math.min(255, parseInt(hex.substring(3,5), 16) + amt);
+  let b = Math.min(255, parseInt(hex.substring(5,7), 16) + amt);
+  return "#" + r.toString(16).padStart(2,'0') + g.toString(16).padStart(2,'0') + b.toString(16).padStart(2,'0');
+}
+
+function dim(hex, factor=0.35) {
+  let r = Math.floor(parseInt(hex.substring(1,3), 16) * factor);
+  let g = Math.floor(parseInt(hex.substring(3,5), 16) * factor);
+  let b = Math.floor(parseInt(hex.substring(5,7), 16) * factor);
+  return "#" + r.toString(16).padStart(2,'0') + g.toString(16).padStart(2,'0') + b.toString(16).padStart(2,'0');
+}
+
+function drawPortGroup(b, ports, color, glyph) {
+  let bySide = {Top:[], Right:[], Bottom:[], Left:[]};
+  for(let p of ports) if(bySide[p.side]) bySide[p.side].push(p);
+  
+  let px = b.gx*CELL+2, py = b.gy*CELL+2, pw = b.gw*CELL-4, ph = b.gh*CELL-4, off = PORT_R + 3;
+  let spread = (lo, hi, n) => {
+    if(n===1) return [Math.floor((lo+hi)/2)];
+    let step = (hi-lo)/(n+1), res = [];
+    for(let i=0; i<n; i++) res.push(Math.floor(lo + step*(i+1)));
+    return res;
+  };
+  
+  for(let side of SIDES) {
+    let ps = bySide[side]; if(ps.length === 0) continue;
+    let centres = [];
+    if(side==="Left") centres = spread(py, py+ph, ps.length).map(y => [px-off, y]);
+    if(side==="Right") centres = spread(py, py+ph, ps.length).map(y => [px+pw+off, y]);
+    if(side==="Top") centres = spread(px, px+pw, ps.length).map(x => [x, py-off]);
+    if(side==="Bottom") centres = spread(px, px+pw, ps.length).map(x => [x, py+ph+off]);
+    
+    for(let i=0; i<ps.length; i++) {
+       let [cx, cy] = centres[i], p = ps[i];
+       ctx.fillStyle = dim(color, 0.35); ctx.beginPath(); ctx.arc(cx, cy, PORT_R+2, 0, Math.PI*2); ctx.fill();
+       ctx.fillStyle = color; ctx.strokeStyle = lighten(color, 30); ctx.lineWidth = 1;
+       ctx.beginPath(); ctx.arc(cx, cy, PORT_R, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+       
+       ctx.fillStyle = "#cccccc"; ctx.font = "9px monospace";
+       ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(glyph, cx, cy);
+       
+       if (p.label) {
+         let lx = cx, ly = cy, loff = PORT_R + 12;
+         if(side==="Left") lx -= loff; else if(side==="Right") lx += loff;
+         else if(side==="Top") ly -= loff; else if(side==="Bottom") ly += loff;
+         ctx.fillStyle = color; ctx.font = "bold 10px monospace"; ctx.fillText(p.label, lx, ly);
+       }
+    }
+  }
+}
+
+function overlaps(a, b) {
+  return !(a.gx+a.gw <= b.gx || b.gx+b.gw <= a.gx || a.gy+a.gh <= b.gy || b.gy+b.gh <= a.gy);
+}
+function bldgAt(gx, gy) {
+  return app.buildings.find(b => gx >= b.gx && gx < b.gx+b.gw && gy >= b.gy && gy < b.gy+b.gh) || null;
+}
+
+canvas.addEventListener("mousemove", e => {
+  if (app.isPanning) {
+    let w = document.getElementById("canvas-wrapper");
+    w.scrollLeft = app.panScrollX - (e.clientX - app.panStartX);
+    w.scrollTop = app.panScrollY - (e.clientY - app.panStartY);
+    return;
+  }
+
+  let rect = canvas.getBoundingClientRect();
+  let gx = Math.floor((e.clientX - rect.left)/(CELL * app.zoom)), gy = Math.floor((e.clientY - rect.top)/(CELL * app.zoom));
+  app.hoverCell = [gx, gy];
+  
+  if(app.tool === "DRAW" && app.drawStart) {
+    app.drawCur = [Math.max(0, Math.min(app.gridW-1, gx)), Math.max(0, Math.min(app.gridH-1, gy))];
+    redraw();
+  } else if(app.tool === "SELECT" && app.moveOff && app.selId) {
+    let b = app.buildings.find(x => x.id === app.selId);
+    if(b) {
+       let newGx = Math.max(0, Math.min(app.gridW - b.gw, gx - app.moveOff[0]));
+       let newGy = Math.max(0, Math.min(app.gridH - b.gh, gy - app.moveOff[1]));
+       let candidate = {...b, gx: newGx, gy: newGy};
+       if(!app.buildings.find(o => o.id !== b.id && overlaps(candidate, o))) { b.gx = newGx; b.gy = newGy; }
+       redraw();
+    }
+  } else { redraw(); }
+});
+
+canvas.addEventListener("mousedown", e => {
+  if (e.ctrlKey && e.button === 0) {
+    app.isPanning = true;
+    app.panStartX = e.clientX; app.panStartY = e.clientY;
+    let w = document.getElementById("canvas-wrapper");
+    app.panScrollX = w.scrollLeft; app.panScrollY = w.scrollTop;
+    return;
+  }
+
+  if(!app.hoverCell) return;
+  let [gx, gy] = app.hoverCell;
+  if(gx < 0 || gx >= app.gridW || gy < 0 || gy >= app.gridH) return;
+  
+  if(app.tool === "PLACE" && app.presetBuf) {
+    let p = JSON.parse(JSON.stringify(app.presetBuf));
+    p.id = uuid(); p.gx = gx; p.gy = gy;
+    if(!app.buildings.find(o => overlaps(p, o))) { app.buildings.push(p); selectBuilding(p.id); }
+    app.presetBuf = null; setTool("SELECT");
+  } else if(app.tool === "DRAW") {
+    app.drawStart = app.drawCur = [gx, gy];
+  } else if(app.tool === "SELECT") {
+    let hit = bldgAt(gx, gy);
+    if(hit) { selectBuilding(hit.id); app.moveOff = [gx - hit.gx, gy - hit.gy]; }
+    else { selectBuilding(null); }
+  } else if(app.tool === "ERASE") {
+    let hit = bldgAt(gx, gy);
+    if(hit) {
+      if(hit.id === app.selId) selectBuilding(null);
+      app.buildings = app.buildings.filter(b => b.id !== hit.id); redraw();
+    }
+  }
+});
+
+canvas.addEventListener("mouseup", e => {
+  if (app.isPanning) {
+    app.isPanning = false;
+    return;
+  }
+  if(app.tool === "DRAW" && app.drawStart && app.drawCur) {
+    let gxLo = Math.min(app.drawStart[0], app.drawCur[0]), gxHi = Math.max(app.drawStart[0], app.drawCur[0]);
+    let gyLo = Math.min(app.drawStart[1], app.drawCur[1]), gyHi = Math.max(app.drawStart[1], app.drawCur[1]);
+    let b = { id: uuid(), name: "Building", color: BPAL[app.buildings.length % BPAL.length],
+              gx: gxLo, gy: gyLo, gw: gxHi-gxLo+1, gh: gyHi-gyLo+1, inputs: [], outputs: [] };
+    if(!app.buildings.find(o => overlaps(b, o))) { app.buildings.push(b); selectBuilding(b.id); }
+    app.drawStart = app.drawCur = null; redraw();
+  }
+  app.moveOff = null;
+});
+canvas.addEventListener("mouseleave", () => { 
+  app.isPanning = false;
+  app.hoverCell = null; redraw(); 
+});
+
+document.getElementById("canvas-wrapper").addEventListener("wheel", e => {
+  e.preventDefault();
+  let newZoom = Math.max(0.2, Math.min(3.0, app.zoom + (e.deltaY < 0 ? 0.1 : -0.1)));
+  if (newZoom !== app.zoom) { app.zoom = Math.round(newZoom * 10) / 10; resizeCanvas(); }
+}, {passive: false});
+
+document.getElementById("btn-zoom-in").onclick = () => { app.zoom = Math.min(3.0, Math.round((app.zoom + 0.1) * 10) / 10); resizeCanvas(); };
+document.getElementById("btn-zoom-out").onclick = () => { app.zoom = Math.max(0.2, Math.round((app.zoom - 0.1) * 10) / 10); resizeCanvas(); };
+
+function selectBuilding(id) { app.selId = id; renderProps(); redraw(); }
+
+function setTool(t) {
+  app.tool = t;
+  document.querySelectorAll(".tool-btn").forEach(b => b.classList.remove("active"));
+  document.getElementById("btn-" + t.toLowerCase()).classList.add("active");
+  canvas.style.cursor = {"SELECT":"arrow", "DRAW":"crosshair", "ERASE":"crosshair", "PLACE":"cell"}[t] || "arrow";
+  let hints = {"SELECT": "SELECT – click to select a building; drag to move it", "DRAW": "DRAW   – click & drag on the grid to create a new building",
+               "ERASE": "ERASE  – click a building to delete it", "PLACE": "PLACE  – click on the grid to place the preset; Esc to cancel"};
+  document.getElementById("status-bar").innerText = hints[t] || "";
+}
+
+function renderProps() {
+  let p = document.getElementById("props-panel"), b = app.buildings.find(x => x.id === app.selId);
+  if(!b) return p.innerHTML = `<div style="border-top:3px solid var(--accent); padding:10px; color:var(--dim); font-weight:bold;">NO BUILDING SELECTED</div>`;
+  
+  let html = `<div style="border-top:3px solid var(--accent); padding:10px; color:var(--accent); font-weight:bold;">▸ ${b.name}</div>
+  <div class="panel-section">
+    <div class="panel-header">NAME</div>
+    <input type="text" id="prop-name" value="${b.name}">
+    <div class="panel-header" style="margin-top:10px;">COLOR</div>
+    <div class="color-swatches">${BPAL.map(c => `<div class="swatch" style="background:${c}" onclick="updateProp('color', '${c}')"></div>`).join("")}</div>
+    <hr style="border-color:#2a2a2a">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:5px;">
+      <span style="color:var(--in-c); font-weight:bold; font-size:11px;">⬤ INPUTS (I)</span>
+      <button class="btn" style="padding:2px 6px; color:var(--in-c);" onclick="addPort('inputs')">+</button>
+    </div><div id="ports-in"></div>
+    <hr style="border-color:#2a2a2a; margin-top:10px;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:5px;">
+      <span style="color:var(--out-c); font-weight:bold; font-size:11px;">⬤ OUTPUTS (O)</span>
+      <button class="btn" style="padding:2px 6px; color:var(--out-c);" onclick="addPort('outputs')">+</button>
+    </div><div id="ports-out"></div>
+    <hr style="border-color:#2a2a2a; margin-top:10px;">
+    <button class="btn" style="width:100%; background:#2c3e50; color:white; font-weight:bold; margin-bottom:5px;" onclick="rotateSelected()">↻ Rotate Building (R)</button>
+    <button class="btn" style="width:100%; background:var(--accent2); color:white; font-weight:bold; margin-bottom:5px;" onclick="saveAsPreset()">⊞ Save as Preset</button>
+    <button class="btn danger" style="width:100%; background:#3a1414;" onclick="deleteSelected()">✕ Delete Building</button>
+  </div>`;
+  
+  p.innerHTML = html;
+  document.getElementById("prop-name").addEventListener("input", e => { b.name = e.target.value; redraw(); });
+  
+  let rRows = (type, c) => {
+    let container = document.getElementById(type === 'inputs' ? 'ports-in' : 'ports-out');
+    b[type].forEach((p, i) => {
+       let r = document.createElement("div"); r.className = "input-row";
+       r.innerHTML = `<input type="text" value="${p.label || ''}" style="flex:1" oninput="updatePort('${type}', ${i}, 'label', this.value)">
+         <select style="width:70px" onchange="updatePort('${type}', ${i}, 'side', this.value)">
+           ${SIDES.map(s => `<option value="${s}" ${s===p.side?'selected':''}>${s}</option>`).join("")}
+         </select><button class="btn danger" style="background:#2e1212; padding:2px 6px;" onclick="removePort('${type}', ${i})">✕</button>`;
+       container.appendChild(r);
+    });
+  };
+  rRows('inputs'); rRows('outputs');
+}
+
+window.updateProp = (k, v) => { let b = app.buildings.find(x => x.id === app.selId); if(b) { b[k] = v; redraw(); } };
+window.addPort = (t) => { let b = app.buildings.find(x => x.id === app.selId); if(b && b[t].length < 4) { b[t].push({label:"", side: t==='inputs'?'Left':'Right'}); renderProps(); redraw(); } };
+window.updatePort = (t, i, k, v) => { let b = app.buildings.find(x => x.id === app.selId); if(b) { b[t][i][k] = v; redraw(); } };
+window.removePort = (t, i) => { let b = app.buildings.find(x => x.id === app.selId); if(b) { b[t].splice(i, 1); renderProps(); redraw(); } };
+window.deleteSelected = () => { app.buildings = app.buildings.filter(b => b.id !== app.selId); selectBuilding(null); };
+window.rotateSelected = () => {
+  let b = app.buildings.find(x => x.id === app.selId);
+  if(b) {
+     let tmp = b.gw; b.gw = b.gh; b.gh = tmp;
+     let rot = s => ({"Top":"Right","Right":"Bottom","Bottom":"Left","Left":"Top"}[s]);
+     b.inputs.forEach(p => p.side = rot(p.side));
+     b.outputs.forEach(p => p.side = rot(p.side));
+     renderProps(); redraw();
+  }
+};
+window.saveAsPreset = () => {
+  let b = app.buildings.find(x => x.id === app.selId);
+  if(b) {
+     let p = JSON.parse(JSON.stringify(b)); p.id = uuid();
+     let names = app.presets.map(x => x.name), base = p.name, n = 2;
+     while(names.includes(p.name)) { p.name = `${base} (${n})`; n++; }
+     app.presets.push(p); savePresets();
+  }
+};
+
+function renderPresets() {
+  let c = document.getElementById("presets-panel");
+  let h = `<div style="border-top:2px solid var(--accent2); padding:5px 10px; display:flex; align-items:center; gap:5px;">
+    <span style="color:var(--accent); font-weight:bold; font-size:11px;">PRESETS</span><span style="color:var(--dim); font-size:9px; flex:1;">saved locally</span>
+    <button class="btn" style="padding:2px 6px; font-size:10px;" onclick="importPresets()" title="Import Presets">📂</button>
+    <button class="btn" style="padding:2px 6px; font-size:10px;" onclick="exportPresets()" title="Export Presets">💾</button>
+  </div><div id="presets-list">`;
+  if(app.presets.length === 0) h += `<div style="color:var(--dim); text-align:center; padding:20px;">No presets saved yet.<br><br>Select a building and<br>click 'Save as Preset'.</div>`;
+  else {
+    app.presets.forEach((p, i) => {
+      let inL = p.inputs.map(x=>x.label).filter(x=>x).join(", ") || "—", outL = p.outputs.map(x=>x.label).filter(x=>x).join(", ") || "—";
+      h += `<div class="preset-card">
+        <div style="display:flex; align-items:center; gap:8px; margin-bottom:5px;"><div class="swatch" style="background:${p.color}; width:16px; height:16px;"></div><b style="font-size:12px;">${p.name}</b></div>
+        <div style="color:var(--dim); margin-bottom:3px;">${p.gw}×${p.gh} cells &nbsp; IN:${p.inputs.length} OUT:${p.outputs.length}</div>
+        <div style="color:var(--in-c);">▶ ${inL}</div><div style="color:var(--out-c);">◀ ${outL}</div>
+        <div style="display:flex; gap:5px; margin-top:5px;"><button class="btn" style="background:var(--accent2); color:white; flex:1;" onclick="beginPlacePreset(${i})">Place on Grid</button><button class="btn danger" style="background:#2e1212;" onclick="deletePreset(${i})">✕</button></div>
+      </div>`;
+    });
+  }
+  c.innerHTML = h + `</div>`;
+}
+
+window.beginPlacePreset = (i) => { app.presetBuf = JSON.parse(JSON.stringify(app.presets[i])); setTool("PLACE"); };
+window.deletePreset = (i) => { app.presets.splice(i, 1); savePresets(); };
+
+window.exportPresets = () => {
+  if(app.presets.length === 0) return alert("No presets to export.");
+  let url = URL.createObjectURL(new Blob([JSON.stringify(app.presets, null, 2)], {type: "application/json"}));
+  let a = document.createElement("a"); a.href = url; a.download = "presets.json"; a.click(); URL.revokeObjectURL(url);
+};
+
+window.importPresets = () => {
+  let i = document.createElement("input"); i.type = "file"; i.accept = ".json";
+  i.onchange = e => {
+     let f = e.target.files[0]; if(!f) return;
+     let r = new FileReader();
+     r.onload = ev => {
+       try {
+         let data = JSON.parse(ev.target.result);
+         if(!Array.isArray(data)) throw new Error("Invalid format");
+         data.forEach(p => { p.id = uuid(); app.presets.push(p); });
+         savePresets();
+       } catch(err) { alert("Failed to load presets file."); }
+     };
+     r.readAsText(f);
+  };
+  i.click();
+};
+
+document.addEventListener("keydown", e => {
+  if(e.target.tagName === "INPUT") return;
+  if(e.key === "Delete" || e.key === "Backspace") deleteSelected();
+  if(e.key === "Escape") { if(app.tool === "PLACE") { app.presetBuf = null; setTool("SELECT"); } else selectBuilding(null); }
+  if(e.key.toLowerCase() === "s") setTool("SELECT");
+  if(e.key.toLowerCase() === "d") setTool("DRAW");
+  if(e.key.toLowerCase() === "e") setTool("ERASE");
+  if(e.key.toLowerCase() === "i") addPort("inputs");
+  if(e.key.toLowerCase() === "o") addPort("outputs");
+  if(e.key.toLowerCase() === "r") {
+    if(app.tool === "PLACE" && app.presetBuf) {
+      let tmp = app.presetBuf.gw; app.presetBuf.gw = app.presetBuf.gh; app.presetBuf.gh = tmp;
+      let rot = s => ({"Top":"Right","Right":"Bottom","Bottom":"Left","Left":"Top"}[s]);
+      app.presetBuf.inputs.forEach(p => p.side = rot(p.side));
+      app.presetBuf.outputs.forEach(p => p.side = rot(p.side));
+      redraw();
+    } else { window.rotateSelected(); }
+  }
+});
+
+document.getElementById("btn-select").onclick = () => setTool("SELECT");
+document.getElementById("btn-draw").onclick = () => setTool("DRAW");
+document.getElementById("btn-erase").onclick = () => setTool("ERASE");
+document.getElementById("btn-clear").onclick = () => { if(confirm("Remove all buildings from the canvas?")) { app.buildings = []; selectBuilding(null); } };
+
+document.getElementById("btn-save").onclick = () => {
+  let data = { grid_w: app.gridW, grid_h: app.gridH, buildings: app.buildings };
+  let url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], {type: "application/json"}));
+  let a = document.createElement("a"); a.href = url; a.download = "layout.json"; a.click(); URL.revokeObjectURL(url);
+};
+
+document.getElementById("btn-load").onclick = () => {
+  let i = document.createElement("input"); i.type = "file"; i.accept = ".json";
+  i.onchange = e => {
+     let f = e.target.files[0]; if(!f) return;
+     let r = new FileReader();
+     r.onload = ev => {
+       try {
+         let data = JSON.parse(ev.target.result);
+         app.gridW = data.grid_w || DEFAULT_W; app.gridH = data.grid_h || DEFAULT_H; app.buildings = data.buildings || [];
+         selectBuilding(null); resizeCanvas();
+       } catch(err) { alert("Failed to load file."); }
+     };
+     r.readAsText(f);
+  };
+  i.click();
+};
+
+document.getElementById("btn-resize").onclick = () => {
+  document.getElementById("dlg-grid-w").value = app.gridW;
+  document.getElementById("dlg-grid-h").value = app.gridH;
+  document.getElementById("resize-dialog").showModal();
+};
+document.getElementById("btn-apply-resize").onclick = () => {
+  let w = parseInt(document.getElementById("dlg-grid-w").value), h = parseInt(document.getElementById("dlg-grid-h").value);
+  if(w >= 5 && h >= 5) { app.gridW = w; app.gridH = h; app.buildings = app.buildings.filter(b => b.gx+b.gw <= w && b.gy+b.gh <= h); resizeCanvas(); }
+  document.getElementById("resize-dialog").close();
+};
+document.getElementById("btn-cancel-resize").onclick = () => document.getElementById("resize-dialog").close();
+
+resizeCanvas(); renderProps(); renderPresets();
+document.getElementById("resize-dialog").showModal();
+</script>
+</body>
+</html>
