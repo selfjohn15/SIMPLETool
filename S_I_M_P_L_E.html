@@ -281,8 +281,7 @@ function drawBuilding(b) {
   ctx.textAlign = "right"; ctx.textBaseline = "bottom"; ctx.font = "10px monospace";
   ctx.fillStyle = lighten(b.color, 30); ctx.fillText(`${b.gw}×${b.gh}`, px+pw-2, py+ph-2);
   
-  drawPortGroup(b, b.inputs, "#2ecc71", "▶");
-  drawPortGroup(b, b.outputs, "#e74c3c", "◀");
+  drawAllPorts(b);
 }
 
 function lighten(hex, amt=55) {
@@ -299,10 +298,7 @@ function dim(hex, factor=0.35) {
   return "#" + r.toString(16).padStart(2,'0') + g.toString(16).padStart(2,'0') + b.toString(16).padStart(2,'0');
 }
 
-function drawPortGroup(b, ports, color, glyph) {
-  let bySide = {Top:[], Right:[], Bottom:[], Left:[]};
-  for(let p of ports) if(bySide[p.side]) bySide[p.side].push(p);
-  
+function drawAllPorts(b) {
   let px = b.gx*CELL+2, py = b.gy*CELL+2, pw = b.gw*CELL-4, ph = b.gh*CELL-4, off = PORT_R + 3;
   let spread = (lo, hi, n) => {
     if(n===1) return [Math.floor((lo+hi)/2)];
@@ -312,7 +308,11 @@ function drawPortGroup(b, ports, color, glyph) {
   };
   
   for(let side of SIDES) {
-    let ps = bySide[side]; if(ps.length === 0) continue;
+    let ins = b.inputs.filter(p => p.side === side);
+    let outs = b.outputs.filter(p => p.side === side);
+    let ps = [...ins, ...outs];
+    if(ps.length === 0) continue;
+    
     let centres = [];
     if(side==="Left") centres = spread(py, py+ph, ps.length).map(y => [px-off, y]);
     if(side==="Right") centres = spread(py, py+ph, ps.length).map(y => [px+pw+off, y]);
@@ -321,6 +321,10 @@ function drawPortGroup(b, ports, color, glyph) {
     
     for(let i=0; i<ps.length; i++) {
        let [cx, cy] = centres[i], p = ps[i];
+       let isInput = i < ins.length;
+       let color = isInput ? "#2ecc71" : "#e74c3c";
+       let glyph = isInput ? "▶" : "◀";
+       
        ctx.fillStyle = dim(color, 0.35); ctx.beginPath(); ctx.arc(cx, cy, PORT_R+2, 0, Math.PI*2); ctx.fill();
        ctx.fillStyle = color; ctx.strokeStyle = lighten(color, 30); ctx.lineWidth = 1;
        ctx.beginPath(); ctx.arc(cx, cy, PORT_R, 0, Math.PI*2); ctx.fill(); ctx.stroke();
